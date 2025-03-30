@@ -34,7 +34,7 @@ def get_song_file(song_name, character_name, energy_level=None):
 
 def get_instrument_file(song_name, instrument_name):
     #return "Adele/adele_instrument_piano.webm"
-    file_path = f"{SONG_NAMES[song_name]}/{SONG_NAMES[song_name]}_{INSTRUMENT_VIDEOS[instrument_name].webm}"
+    file_path = f"{SONG_NAMES[song_name]}/{SONG_NAMES[song_name]}_{INSTRUMENT_VIDEOS[instrument_name]}.webm"
     print(file_path)
     return file_path
 
