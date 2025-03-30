@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Music Avatar</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles/styles.css') }}">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
+    .caption-button {
+        background-color: #007acc; /* Button color */
+        color: #fff; /* Text color */
+        border: none;
+        padding: 0.5rem 1rem;
+        font-size: 1rem;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: background-color 0.3s;
+    }
+
+    .caption-button:hover {
+        background-color: #005fa3; /* Darker shade on hover */
+    }
+  </style>
+</head>
+<body>
+  <div class="main-content">
+    <!-- Left: Video area -->
+    <div class="video-container">
+      <!-- Character (vocal) Video -->
+      <video 
+        id="characterVideo"
+        class="video-layer"
+        src="{{ url_for('static', filename='videos/' + character_video_file) }}" loop controls>
+        Your browser does not support the video tag.
+      </video>
+
+      <!-- Instrument overlay:
+           We use a hidden video element as the source and draw its keyed frame on a canvas -->
+      {% if instrument_video_file %}
+        <video 
+          id="instrumentVideo"
+          src="{{ url_for('static', filename='videos/' + instrument_video_file) }}"
+          preload="auto"
+          style="display: none;" 
+          muted="true">
+          Your browser does not support the video tag.
+        </video>
+        <canvas id="instrumentCanvas"></canvas>
+      {% endif %}
+    </div>
+
+    <!-- Right: Properties Panel -->
+    <div class="properties-panel">
+      <h2>Properties</h2>
+      <div class="simulation-properties">
+        <form action="/" method="POST">
+          <h3>Simulation Properties</h3>
+          <div class="form-group">
+            <label for="song-choice">Song Choice</label>
+            <select id="song-choice" name="song-choice">
+              {% for song in songs %}
+                <option value="{{ song }}">{{ song }}</option>
+              {% endfor %}
+            </select>
+            <input type="hidden" id="old-song-choice" name="old_song_choice" value="{{ old_song_choice }}">
+          </div>
+          <div class="form-group">
+            <label for="character-select">Character Select</label>
+            <select id="character-select" name="character-select">
+              <option value="vocal_girl">Julin</option>
+              <option value="vocal_boy">Danial</option>
+            </select>
+            <input type="hidden" id="old-character-select" name="old_character_select" value="{{ old_character_select }}">
+          </div>
+          <div class="form-group">
+            <label for="energy">Energy</label>
+            <select id="energy" name="energy">
+              <option value="high">High</option>
+              <option value="low">Low</option>
+            </select>
+            <input type="hidden" id="old-energy" name="old_energy" value="{{ old_energy }}">
+          </div>
+        </div>
+
+        <div class="accessibility">
+          <h3>Accessibility</h3>
+          <div class="form-group">
+              <label for="instruments">Instruments</label>
+              <select id="instruments" name="instruments">
+                <option value="None">None</option>
+                <option value="All">All</option>
+                <option value="Drums">Drums</option>
+                <option value="Strings">Strings</option>
+                <option value="Keyboard">Keyboard</option>
+              </select>
+              <input type="hidden" id="old-instruments" name="old_instruments" value="{{ old_instruments }}">
+          </div>
+          <div class="form-group">
+              <label>Captions</label>
+              <label class="toggle-switch" style="flex: none;">
+                  <input type="checkbox" id="captions-toggle" checked>
+                  <span class="slider"></span>
+              </label>
+              <input type="hidden" id="captions" name="captions">
+              <input type="hidden" id="old-captions" name="old_captions" value="{{ old_captions }}">
+          </div>
+        </div>
+        <div class="button-group">
+          <button class="reset-button" type="button">Reset</button>
+          <button class="apply-button" type="submit">Apply</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+ <!-- JavaScript for syncing videos and applying improved chroma key to instrument overlay -->
+<script>
+    document.addEventListener('DOMContentLoaded', function(){
+      var characterVideo = document.getElementById('characterVideo');
+      var instrumentVideo = document.getElementById('instrumentVideo');
+      var instrumentCanvas = document.getElementById('instrumentCanvas');
+      if (!instrumentCanvas || !instrumentVideo) return; // No instrument overlay selected
+  
+      var ctx = instrumentCanvas.getContext('2d');
+  
+      // Resize the canvas to match the video container size
+      function resizeCanvas() {
+        instrumentCanvas.width = characterVideo.clientWidth;
+        instrumentCanvas.height = characterVideo.clientHeight;
+      }
+      window.addEventListener('resize', resizeCanvas);
+      resizeCanvas();
+  
+      // When the character video plays, sync and start the instrument video
+      characterVideo.addEventListener('play', function(){
+        //instrumentVideo.currentTime = characterVideo.currentTime;
+        instrumentVideo.play();
+        updateInstrumentFrame();
+      });
+  
+      // Pause instrument video when character video pauses
+      characterVideo.addEventListener('pause', function(){
+        instrumentVideo.pause();
+      });
+  
+      // Improved chroma key: remove green pixels by checking that green is not only high but also
+      // significantly higher than the red and blue channels.
+      function updateInstrumentFrame() {
+        if (characterVideo.paused || characterVideo.ended) return;
+        // Sync the instrument video with the character video
+        //instrumentVideo.currentTime = characterVideo.currentTime;
+  
+        if (instrumentVideo.videoWidth && instrumentVideo.videoHeight) {
+          // Calculate aspect ratios to preserve video dimensions
+          var videoAspect = instrumentVideo.videoWidth / instrumentVideo.videoHeight;
+          var canvasAspect = instrumentCanvas.width / instrumentCanvas.height;
+          var drawWidth, drawHeight, offsetX, offsetY;
+  
+          if (canvasAspect > videoAspect) {
+            // Canvas is wider; fit based on height
+            drawHeight = instrumentCanvas.height;
+            drawWidth = drawHeight * videoAspect;
+            offsetX = (instrumentCanvas.width - drawWidth) / 2;
+            offsetY = 0;
+          } else {
+            // Canvas is taller; fit based on width
+            drawWidth = instrumentCanvas.width;
+            drawHeight = drawWidth / videoAspect;
+            offsetX = 0;
+            offsetY = (instrumentCanvas.height - drawHeight) / 2;
+          }
+  
+          try {
+            ctx.drawImage(instrumentVideo, offsetX, offsetY, drawWidth, drawHeight);
+          } catch (e) {
+            requestAnimationFrame(updateInstrumentFrame);
+            return;
+          }
+  
+          ctx.clearRect(0, 0, instrumentCanvas.width, instrumentCanvas.height);
+          ctx.drawImage(instrumentVideo, offsetX, offsetY, drawWidth, drawHeight);
+
+          // Get the pixel data from the drawn area
+          var frame = ctx.getImageData(offsetX, offsetY, drawWidth, drawHeight);
+          var data = frame.data;
+          // Define threshold in pixels for the bottom edge key-out
+          var bottomThreshold = 500; 
+          var tolerance = 40; // your tolerance value for green keying
+
+          // Loop over every pixel by row and column
+          for (var y = 0; y < drawHeight; y++) {
+            for (var x = 0; x < drawWidth; x++) {
+              // Calculate the index in the pixel data array
+              var index = (y * drawWidth + x) * 4;
+              var r = data[index + 0];
+              var g = data[index + 1];
+              var b = data[index + 2];
+
+              // Standard chroma key: if green is high and significantly above red and blue
+              if (g > 100 && (g - r) > tolerance && (g - b) > tolerance) {
+                data[index + 3] = 0; // Make pixel fully transparent
+              }
+              
+              // Key out bottom edge pixels if within the bottomThreshold rows
+              if (y >= (drawHeight - bottomThreshold)) {
+                //console.log("Keying out bottom edge pixels");
+                data[index + 3] = 0;
+              }
+            }
+          }
+
+          ctx.putImageData(frame, offsetX, offsetY);
+        }
+        requestAnimationFrame(updateInstrumentFrame);
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const captionsToggle = document.getElementById('captions-toggle');
+        const captions = document.getElementById('captions');
+
+        captionsToggle.addEventListener('change', function() {
+            if (this.checked) {
+                console.log("Captions are ON");
+                // Add functionality for enabling captions
+                captions.value = "on";
+            } else {
+                console.log("Captions are OFF");
+                // Add functionality for disabling captions
+                captions.value = "off";
+            }
+        });
+    });
+</script>
+  
+</body>
+</html>
