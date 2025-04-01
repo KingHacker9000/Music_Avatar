@@ -27,7 +27,7 @@
     <!-- Left: Video area -->
     <div class="video-container">
       <!-- Character (vocal) Video -->
-      <video 
+      <video
         id="characterVideo"
         class="video-layer"
         src="{{ url_for('static', filename='videos/' + character_video_file) }}" loop controls>
@@ -37,11 +37,11 @@
       <!-- Instrument overlay:
            We use a hidden video element as the source and draw its keyed frame on a canvas -->
       {% if instrument_video_file %}
-        <video 
+        <video
           id="instrumentVideo"
           src="{{ url_for('static', filename='videos/' + instrument_video_file) }}"
           preload="auto"
-          style="display: none;" 
+          style="display: none;"
           muted="true">
           Your browser does not support the video tag.
         </video>
@@ -53,33 +53,34 @@
     <div class="properties-panel">
       <h2>Properties</h2>
       <div class="simulation-properties">
-        <form action="/" method="POST">
+        <form action="/{{ user_id }}" method="POST">
           <h3>Simulation Properties</h3>
           <div class="form-group">
             <label for="song-choice">Song Choice</label>
             <select id="song-choice" name="song-choice">
+              {# Ensure the selected attribute is set correctly based on backend data #}
               {% for song in songs %}
-                <option value="{{ song }}">{{ song }}</option>
+                <option value="{{ song }}" {% if song == selected_song %}selected{% endif %}>{{ song }}</option>
               {% endfor %}
             </select>
-            <input type="hidden" id="old-song-choice" name="old_song_choice" value="{{ old_song_choice }}">
+            <input type="hidden" id="old-song-choice" name="old_song_choice" value="{{ selected_song }}">
           </div>
           <div class="form-group">
             <label for="character-select">Character Select</label>
             <select id="character-select" name="character-select">
-              <option value="vocal_girl">Julin</option>
-              <option value="vocal_boy">Danial</option>
+              <option value="vocal_girl" {% if selected_character == 'vocal_girl' %}selected{% endif %}>Julin</option>
+              <option value="vocal_boy" {% if selected_character == 'vocal_boy' %}selected{% endif %}>Danial</option>
             </select>
-            <input type="hidden" id="old-character-select" name="old_character_select" value="{{ old_character_select }}">
+            <input type="hidden" id="old-character-select" name="old_character_select" value="{{ selected_character}}">
           </div>
-          <div class="form-group">
+          <!-- <div class="form-group">
             <label for="energy">Energy</label>
             <select id="energy" name="energy">
-              <option value="high">High</option>
-              <option value="low">Low</option>
+              <option value="high" {% if selected_energy == 'high' %}selected{% endif %}>High</option>
+              <option value="low" {% if selected_energy == 'low' %}selected{% endif %}>Low</option>
             </select>
-            <input type="hidden" id="old-energy" name="old_energy" value="{{ old_energy }}">
-          </div>
+            <input type="hidden" id="old-energy" name="old_energy" value="{{ selected_energy }}">
+          </div> -->
         </div>
 
         <div class="accessibility">
@@ -87,22 +88,20 @@
           <div class="form-group">
               <label for="instruments">Instruments</label>
               <select id="instruments" name="instruments">
-                <option value="None">None</option>
-                <option value="All">All</option>
-                <option value="Drums">Drums</option>
-                <option value="Strings">Strings</option>
-                <option value="Keyboard">Keyboard</option>
+                {# Options will be populated by JavaScript #}
+                {# Keep one placeholder or leave empty #}
+                <option value="{{selected_instrument}}">{{selected_instrument}}</option> 
               </select>
-              <input type="hidden" id="old-instruments" name="old_instruments" value="{{ old_instruments }}">
+              <input type="hidden" id="old-instruments" name="old_instruments" value="{{selected_instrument}}">
           </div>
           <div class="form-group">
               <label>Captions</label>
               <label class="toggle-switch" style="flex: none;">
-                  <input type="checkbox" id="captions-toggle" checked>
+                  <input type="checkbox" id="captions-toggle" {% if selected_captions == 'on' %}checked{% endif %}>
                   <span class="slider"></span>
               </label>
-              <input type="hidden" id="captions" name="captions">
-              <input type="hidden" id="old-captions" name="old_captions" value="{{ old_captions }}">
+              <input type="hidden" id="captions" name="captions" value="{{ selected_captions }}">
+              <input type="hidden" id="old-captions" name="old_captions" value="{{ selected_captions }}">
           </div>
         </div>
         <div class="button-group">
@@ -112,126 +111,240 @@
       </form>
     </div>
   </div>
-  
- <!-- JavaScript for syncing videos and applying improved chroma key to instrument overlay -->
+
+ <!-- JavaScript -->
 <script>
     document.addEventListener('DOMContentLoaded', function(){
+      // --- Video Syncing and Chroma Key Logic (Existing) ---
       var characterVideo = document.getElementById('characterVideo');
       var instrumentVideo = document.getElementById('instrumentVideo');
       var instrumentCanvas = document.getElementById('instrumentCanvas');
-      if (!instrumentCanvas || !instrumentVideo) return; // No instrument overlay selected
-  
-      var ctx = instrumentCanvas.getContext('2d');
-  
-      // Resize the canvas to match the video container size
-      function resizeCanvas() {
-        instrumentCanvas.width = characterVideo.clientWidth;
-        instrumentCanvas.height = characterVideo.clientHeight;
-      }
-      window.addEventListener('resize', resizeCanvas);
-      resizeCanvas();
-  
-      // When the character video plays, sync and start the instrument video
-      characterVideo.addEventListener('play', function(){
-        //instrumentVideo.currentTime = characterVideo.currentTime;
-        instrumentVideo.play();
-        updateInstrumentFrame();
-      });
-  
-      // Pause instrument video when character video pauses
-      characterVideo.addEventListener('pause', function(){
-        instrumentVideo.pause();
-      });
-  
-      // Improved chroma key: remove green pixels by checking that green is not only high but also
-      // significantly higher than the red and blue channels.
-      function updateInstrumentFrame() {
-        if (characterVideo.paused || characterVideo.ended) return;
-        // Sync the instrument video with the character video
-        //instrumentVideo.currentTime = characterVideo.currentTime;
-  
-        if (instrumentVideo.videoWidth && instrumentVideo.videoHeight) {
-          // Calculate aspect ratios to preserve video dimensions
-          var videoAspect = instrumentVideo.videoWidth / instrumentVideo.videoHeight;
-          var canvasAspect = instrumentCanvas.width / instrumentCanvas.height;
-          var drawWidth, drawHeight, offsetX, offsetY;
-  
-          if (canvasAspect > videoAspect) {
-            // Canvas is wider; fit based on height
-            drawHeight = instrumentCanvas.height;
-            drawWidth = drawHeight * videoAspect;
-            offsetX = (instrumentCanvas.width - drawWidth) / 2;
-            offsetY = 0;
-          } else {
-            // Canvas is taller; fit based on width
-            drawWidth = instrumentCanvas.width;
-            drawHeight = drawWidth / videoAspect;
-            offsetX = 0;
-            offsetY = (instrumentCanvas.height - drawHeight) / 2;
+      if (instrumentCanvas && instrumentVideo) { // Check existence properly
+          var ctx = instrumentCanvas.getContext('2d');
+
+          function resizeCanvas() {
+            if (!characterVideo || !instrumentCanvas) return; // Add checks
+            instrumentCanvas.width = characterVideo.clientWidth;
+            instrumentCanvas.height = characterVideo.clientHeight;
           }
-  
-          try {
-            ctx.drawImage(instrumentVideo, offsetX, offsetY, drawWidth, drawHeight);
-          } catch (e) {
-            requestAnimationFrame(updateInstrumentFrame);
-            return;
-          }
-  
-          ctx.clearRect(0, 0, instrumentCanvas.width, instrumentCanvas.height);
-          ctx.drawImage(instrumentVideo, offsetX, offsetY, drawWidth, drawHeight);
+          window.addEventListener('resize', resizeCanvas);
+          resizeCanvas(); // Initial resize
 
-          // Get the pixel data from the drawn area
-          var frame = ctx.getImageData(offsetX, offsetY, drawWidth, drawHeight);
-          var data = frame.data;
-          // Define threshold in pixels for the bottom edge key-out
-          var bottomThreshold = 20; 
-          var tolerance = 40; // your tolerance value for green keying
+          characterVideo.addEventListener('play', function(){
+            if (!instrumentVideo) return; // Add check
+            // instrumentVideo.currentTime = characterVideo.currentTime; // Often causes issues, sync in loop
+            instrumentVideo.play();
+            updateInstrumentFrame();
+          });
 
-          // Loop over every pixel by row and column
-          for (var y = 0; y < drawHeight; y++) {
-            for (var x = 0; x < drawWidth; x++) {
-              // Calculate the index in the pixel data array
-              var index = (y * drawWidth + x) * 4;
-              var r = data[index + 0];
-              var g = data[index + 1];
-              var b = data[index + 2];
+          characterVideo.addEventListener('pause', function(){
+            if (!instrumentVideo) return; // Add check
+            instrumentVideo.pause();
+          });
+          
+          characterVideo.addEventListener('seeked', function() {
+              if (!instrumentVideo) return; // Add check
+              // Sync time when main video seeks
+              instrumentVideo.currentTime = characterVideo.currentTime;
+          });
 
-              // Standard chroma key: if green is high and significantly above red and blue
-              if (g > 100 && (g - r) > tolerance && (g - b) > tolerance) {
-                data[index + 3] = 0; // Make pixel fully transparent
+          function updateInstrumentFrame() {
+            if (!characterVideo || !instrumentVideo || !instrumentCanvas || !ctx) return; // Comprehensive checks
+            if (characterVideo.paused || characterVideo.ended) return;
+            
+            // Basic sync attempt (might need refinement depending on browser/video encoding)
+            if (Math.abs(instrumentVideo.currentTime - characterVideo.currentTime) > 0.1) {
+                 instrumentVideo.currentTime = characterVideo.currentTime;
+            }
+
+            if (instrumentVideo.videoWidth && instrumentVideo.videoHeight) {
+              var videoAspect = instrumentVideo.videoWidth / instrumentVideo.videoHeight;
+              var canvasAspect = instrumentCanvas.width / instrumentCanvas.height;
+              var drawWidth, drawHeight, offsetX, offsetY;
+
+              if (canvasAspect > videoAspect) {
+                drawHeight = instrumentCanvas.height;
+                drawWidth = drawHeight * videoAspect;
+                offsetX = (instrumentCanvas.width - drawWidth) / 2;
+                offsetY = 0;
+              } else {
+                drawWidth = instrumentCanvas.width;
+                drawHeight = drawWidth / videoAspect;
+                offsetX = 0;
+                offsetY = (instrumentCanvas.height - drawHeight) / 2;
               }
+
+              // Clear canvas before drawing
+              ctx.clearRect(0, 0, instrumentCanvas.width, instrumentCanvas.height);
               
-              // Key out bottom edge pixels if within the bottomThreshold rows
-              if (y >= (drawHeight - bottomThreshold)) {
-                //console.log("Keying out bottom edge pixels");
-                data[index + 3] = 0;
+              try {
+                ctx.drawImage(instrumentVideo, offsetX, offsetY, drawWidth, drawHeight);
+              } catch (e) {
+                console.error("Error drawing instrument video:", e);
+                requestAnimationFrame(updateInstrumentFrame); // Still request next frame
+                return; // Stop processing this frame
               }
+
+              var frame = ctx.getImageData(offsetX, offsetY, drawWidth, drawHeight);
+              var data = frame.data;
+              var bottomThreshold = 20;
+              var tolerance = 40;
+
+              for (var y = 0; y < drawHeight; y++) {
+                for (var x = 0; x < drawWidth; x++) {
+                  var index = (y * Math.round(drawWidth) + x) * 4; // Use Math.round for safety
+                  var r = data[index + 0];
+                  var g = data[index + 1];
+                  var b = data[index + 2];
+
+                  let makeTransparent = false;
+                  // Chroma key
+                  if (g > 100 && (g - r) > tolerance && (g - b) > tolerance) {
+                    makeTransparent = true;
+                  }
+                  // Bottom edge key
+                  if (y >= (drawHeight - bottomThreshold)) {
+                    makeTransparent = true;
+                  }
+
+                  if (makeTransparent) {
+                    data[index + 3] = 0;
+                  }
+                }
+              }
+              ctx.putImageData(frame, offsetX, offsetY);
             }
+            requestAnimationFrame(updateInstrumentFrame);
           }
+          
+          // Ensure initial frame is drawn if videos are preloaded/autoplay (though controls are present)
+          if (!characterVideo.paused) {
+             updateInstrumentFrame();
+          }
+          
+      } // End of if (instrumentCanvas && instrumentVideo)
 
-          ctx.putImageData(frame, offsetX, offsetY);
-        }
-        requestAnimationFrame(updateInstrumentFrame);
+      // --- Captions Toggle Logic (Existing) ---
+      const captionsToggle = document.getElementById('captions-toggle');
+      const captionsInput = document.getElementById('captions'); // Renamed variable for clarity
+
+      // Initial state based on hidden input (set by server)
+      captionsToggle.checked = captionsInput.value === 'on'; 
+
+      captionsToggle.addEventListener('change', function() {
+          if (this.checked) {
+              console.log("Captions are ON");
+              captionsInput.value = "on";
+          } else {
+              console.log("Captions are OFF");
+              captionsInput.value = "off";
+          }
+      });
+
+      // --- Dynamic Instrument Options Logic (NEW) ---
+      const songChoiceSelect = document.getElementById('song-choice');
+      const instrumentsSelect = document.getElementById('instruments');
+      const oldInstrumentsInput = document.getElementById('old-instruments'); // Get reference to hidden input
+
+      const instrumentOptionsMap = {
+          // Use the exact values from the song choice dropdown options
+          "Die With a Smile": ["Drums", "Piano", "Strings", "None", "All"],
+          "Happy": ["Drums", "Piano", "Strings", "Synth", "None", "All"],
+          "Someone Like You": ["Piano", "None", "All"], // Assuming the value is "Adele"
+          "Imperial March": ["Drums", "Horns", "Strings", "None", "All"], // Assuming the value is "Imperial"
+          "Mario Theme Song": ["None"], // Assuming the value is "Mario"
+          "Vivaldi Spring": ["Piano", "Strings", "None", "All"], // Assuming the value is "Spring"
+          "Uptown Funk": ["Drums", "Horns", "Strings", "None", "All"], // Assuming the value is "Uptown"
+          "Vivaldi Winter": ["Strings", "None", "All"] // Assuming the value is "Winter"
+          // Add entries for any other possible song choices from your `songs` list
+      };
+
+      function updateInstrumentOptions() {
+          const selectedSong = songChoiceSelect.value;
+          // Get the options for the selected song, default to ["None"] if not found
+          const options = instrumentOptionsMap[selectedSong] || ["None"]; 
+          
+          // Store the currently selected instrument value (if any)
+          const previouslySelectedInstrument = instrumentsSelect.value; 
+          // Or use the value from the hidden input on first load
+          const initialInstrument = oldInstrumentsInput.value;
+
+          // Clear existing options
+          instrumentsSelect.innerHTML = '';
+
+          // Add new options
+          let foundPrevious = false;
+          options.forEach(instrument => {
+              const optionElement = document.createElement('option');
+              optionElement.value = instrument;
+              optionElement.textContent = instrument; // Use textContent, it's safer for text
+              instrumentsSelect.appendChild(optionElement);
+              
+              // Check if this option matches the one previously selected OR the initial one
+              if (instrument === previouslySelectedInstrument || instrument === initialInstrument) {
+                  optionElement.selected = true;
+                  foundPrevious = true;
+              }
+          });
+
+          // If the previously selected/initial instrument is not in the new list,
+          // default to the first option (usually "None" or the first valid instrument)
+          if (!foundPrevious && instrumentsSelect.options.length > 0) {
+               // Check if "None" exists, prefer that as default if previous selection is invalid
+               let noneOption = Array.from(instrumentsSelect.options).find(opt => opt.value === "None");
+               if (noneOption) {
+                   noneOption.selected = true;
+               } else {
+                   instrumentsSelect.options[0].selected = true; // Select the first available option
+               }
+          }
+          
+          // Update the hidden input for the *next* submission after a change
+          // Note: This logic might need adjustment based on exactly when 'old_instruments' should reflect the *last applied* value vs. the *current selection*.
+          // For now, we won't update old_instruments here; it gets updated server-side on POST.
       }
-    });
 
-    document.addEventListener('DOMContentLoaded', function() {
-        const captionsToggle = document.getElementById('captions-toggle');
-        const captions = document.getElementById('captions');
+      // Add event listener for song changes
+      songChoiceSelect.addEventListener('change', updateInstrumentOptions);
 
-        captionsToggle.addEventListener('change', function() {
-            if (this.checked) {
-                console.log("Captions are ON");
-                // Add functionality for enabling captions
-                captions.value = "on";
-            } else {
-                console.log("Captions are OFF");
-                // Add functionality for disabling captions
-                captions.value = "off";
-            }
-        });
-    });
+      // --- Initial Setup ---
+      // Call the function once on page load to set the initial instruments
+      updateInstrumentOptions(); 
+      // Make sure the initial selected instrument is correct based on backend data
+      const initialSelectedInstrument = oldInstrumentsInput.value; // Get value from hidden input
+      if (initialSelectedInstrument) {
+          // Check if this value exists in the currently populated options
+          let optionExists = Array.from(instrumentsSelect.options).some(opt => opt.value === initialSelectedInstrument);
+          if (optionExists) {
+             instrumentsSelect.value = initialSelectedInstrument; 
+          } else {
+             // Handle case where saved instrument isn't valid for the initial song
+             // (The logic inside updateInstrumentOptions already tries to handle this)
+             console.warn(`Initial instrument '${initialSelectedInstrument}' not valid for song '${songChoiceSelect.value}'. Defaulting selection.`);
+          }
+      }
+
+
+      // --- Reset Button Logic (Example) ---
+      const resetButton = document.querySelector('.reset-button');
+      resetButton.addEventListener('click', function() {
+          // Option 1: Reset to hardcoded defaults (if known)
+          // document.getElementById('song-choice').value = 'DefaultSong'; // Set to your default
+          // document.getElementById('character-select').value = 'vocal_girl';
+          // ... etc ...
+          
+          // Option 2: Reload the page to get original server-sent values
+          window.location.reload(); 
+
+          // Option 3: Use the 'old' hidden values to reset (more complex)
+          // document.getElementById('song-choice').value = document.getElementById('old-song-choice').value;
+          // document.getElementById('character-select').value = document.getElementById('old-character-select').value;
+          // ... trigger updates if needed, e.g., updateInstrumentOptions() ...
+      });
+
+
+    }); // End of DOMContentLoaded
 </script>
-  
+
 </body>
 </html>

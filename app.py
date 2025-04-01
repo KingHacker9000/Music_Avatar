@@ -1,7 +1,15 @@
-from flask import Flask, render_template, request, url_for
+from flask import Flask, render_template, request, url_for, redirect
 import os
+from CloudDBHelper import CloudDB
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
+
+# Initialize the database
+connection_string = f"{os.environ.get('SQLite_Connection')}apikey={os.environ.get('SQLite_apikey')}"
+db = CloudDB(connection_string, db_name='AvatarInteractions')
 
 # We have just one "song" in this scenario:
 SONG_NAMES = {
@@ -23,6 +31,7 @@ INSTRUMENT_VIDEOS = {
     "Strings": "instruments_strings",
     "Keyboard": "instruments_piano",
     "Horns": "instruments_horns",
+    "Synth": "instruments_synth"
 }
 
 def get_song_file(song_name, character_name, energy_level=None):
@@ -38,40 +47,62 @@ def get_instrument_file(song_name, instrument_name):
     print(file_path)
     return file_path
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
+@app.route('/<user_id>', methods=['GET', 'POST'])
+def user_index(user_id):
     # Default to boy vocal + no instruments
     selected_song = "Die With a Smile"
     selected_character = "vocal_boy"
     selected_song_file = get_song_file(selected_song, selected_character)
     selected_instrument = "None"
     selected_instrument_file = None
+    selected_captions = "off"
 
     if request.method == 'POST':
         # If user clicks "Apply"
         if request.form.get('reset') == 'true':
             # Reset to defaults
-            selected_character = "Boy Vocal"
+            selected_character = "vocal_boy"
             selected_instrument = "None"
         else:
             selected_song = request.form.get('song-choice') or selected_song
             selected_character = request.form.get('character-select') or selected_character
             selected_instrument = request.form.get('instruments') or selected_instrument
-            
+            selected_captions = request.form.get('captions') or selected_captions
+
             selected_song_file = get_song_file(selected_song, selected_character)
             if selected_instrument == "None":
                 selected_instrument_file = None
             else:
                 selected_instrument_file = get_instrument_file(selected_song, selected_instrument)
 
+            if user_id != "-1":
+                # Log the interaction to the database
+                print(f"Logging interaction for user {user_id}")
+                old_song = request.form.get('old_song_choice') or ""
+                old_character = request.form.get('old_character_select') or ""
+                old_instrument = request.form.get('old_instruments') or ""
+                old_captions = request.form.get('old_captions') or ""
+                if old_song != "":
+                    print(f"Old: {old_song} {old_character} {old_instrument} {old_captions}")
+                    print(f"New: {selected_song} {selected_character} {selected_instrument} {selected_captions}")
+                    db.add_interaction(user_id, (old_song, old_character, old_instrument, old_captions), (selected_song, selected_character, selected_instrument, selected_captions))
+
+
     return render_template(
         'index.html',
         songs=SONG_NAMES.keys(),
+        selected_song=selected_song,
         selected_character=selected_character,
         selected_instrument=selected_instrument,
+        selected_captions=selected_captions,
         character_video_file=selected_song_file,
-        instrument_video_file=selected_instrument_file
+        instrument_video_file=selected_instrument_file,
+        user_id=user_id
     )
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    return redirect(url_for('user_index', user_id='-1'))
 
 if __name__ == '__main__':
     # Use the environment variable for the host and port
