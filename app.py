@@ -20,7 +20,6 @@ SONG_NAMES = {
     "Mario Theme Song": "mario", 
     "Vivaldi Spring": "spring", 
     "Uptown Funk": "uptown", 
-    "Vivaldi Winter": "winter",
     "Moonlight": "moonlight"
 }
 
