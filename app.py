@@ -20,7 +20,8 @@ SONG_NAMES = {
     "Mario Theme Song": "Mario", 
     "Vivaldi Spring": "spring", 
     "Uptown Funk": "uptown", 
-    "Vivaldi Winter": "winter"
+    "Vivaldi Winter": "winter",
+    "Moonlight": "moonlight"
 }
 
 # Instrument overlays: Drums, Guitar, Keyboard, Keyboard2
@@ -29,7 +30,7 @@ INSTRUMENT_VIDEOS = {
     "All": "instruments",
     "Drums": "instruments_drums",
     "Strings": "instruments_strings",
-    "Keyboard": "instruments_piano",
+    "Piano": "instruments_piano",
     "Horns": "instruments_horns",
     "Synth": "instruments_synth"
 }
