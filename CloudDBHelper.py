@@ -126,6 +126,16 @@ class CloudDB:
         self._execute_query(query, (user_id, old_form_id, new_form_id))
         print(f"Added interaction: {user_id} - {old_form_info} - {new_form_info}")
 
+    def print_interactions(self):
+        query = """SELECT * FROM Interactions ORDER BY timestamp DESC LIMIT 1;"""
+        interactions = self._execute_query(query, fetch_all=True)
+        print(interactions)
+        for interaction in interactions:
+            query = """SELECT * FROM Forms WHERE form_id = ?;"""
+            old_form = self._execute_query(query, (interaction["Old_Form_Id"],), fetch_one=True)
+            new_form = self._execute_query(query, (interaction["New_Form_Id"],), fetch_one=True)
+            print(f"Interaction: {old_form} - {new_form}")
+
     def close(self):
         """Closes the database connection."""
         if self.conn:
@@ -151,8 +161,11 @@ if __name__ == "__main__":
         db.drop_all_tables()
         exit()
 
-    db.add_user("John Doe")
-    db.add_user("Jane Doe")
+    # db.add_user("John Doe")
+    # db.add_user("Jane Doe")
     #db.add_form(("Song1", "Character1", "Instrument1", "off"))
     #db.add_interaction("user1", ("Song1", "Character1", "Instrument1", "off"), ("Song1", "Character1", "Instrument1", "on"))
+
+    db.print_interactions()
+
     db.close()
