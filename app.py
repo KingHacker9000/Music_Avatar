@@ -36,15 +36,17 @@ INSTRUMENT_VIDEOS = {
 
 def get_song_file(song_name, character_name, energy_level=None):
     file_path = f"{SONG_NAMES[song_name]}/{SONG_NAMES[song_name]}_{character_name}.mp4"
-    print(file_path)
     return file_path
     
-
 
 def get_instrument_file(song_name, instrument_name):
     #return "Adele/adele_instrument_piano.webm"
     file_path = f"{SONG_NAMES[song_name]}/{SONG_NAMES[song_name]}_{INSTRUMENT_VIDEOS[instrument_name]}.webm"
-    print(file_path)
+    return file_path
+
+def get_captions_file(song_name):
+    #return "Adele/adele_captions.webm"
+    file_path = f"{SONG_NAMES[song_name]}/{SONG_NAMES[song_name]}_captions.webm"
     return file_path
 
 @app.route('/<user_id>', methods=['GET', 'POST'])
@@ -56,6 +58,7 @@ def user_index(user_id):
     selected_instrument = "None"
     selected_instrument_file = None
     selected_captions = "off"
+    selected_captions_file = None
 
     if request.method == 'POST':
         # If user clicks "Apply"
@@ -74,6 +77,11 @@ def user_index(user_id):
                 selected_instrument_file = None
             else:
                 selected_instrument_file = get_instrument_file(selected_song, selected_instrument)
+
+            if selected_captions == "on" and selected_song in ["Happy", "Die With a Smile", "Someone Like You", "Uptown Funk"]:
+                selected_captions_file = get_captions_file(selected_song)
+            else:
+                selected_captions_file = None
 
             if user_id != "-1":
                 # Log the interaction to the database
@@ -97,6 +105,7 @@ def user_index(user_id):
         selected_captions=selected_captions,
         character_video_file=selected_song_file,
         instrument_video_file=selected_instrument_file,
+        captions_video_file=selected_captions_file,
         user_id=user_id
     )
 

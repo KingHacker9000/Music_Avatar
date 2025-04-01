@@ -47,6 +47,19 @@
         </video>
         <canvas id="instrumentCanvas"></canvas>
       {% endif %}
+
+      {% if captions_video_file %}
+        <video
+          id="captionsVideo"
+          src="{{ url_for('static', filename='videos/' + captions_video_file) }}"
+          preload="auto"
+          style="display: none;"
+          muted="true">
+          Your browser does not support the video tag.
+        </video>
+        <canvas id="captionsCanvas"></canvas>
+      {% endif %}
+      
     </div>
 
     <!-- Right: Properties Panel -->
@@ -118,7 +131,10 @@
       // --- Video Syncing and Chroma Key Logic (Existing) ---
       var characterVideo = document.getElementById('characterVideo');
       var instrumentVideo = document.getElementById('instrumentVideo');
+      var captionsVideo = document.getElementById('captionsVideo');
       var instrumentCanvas = document.getElementById('instrumentCanvas');
+      var captionsCanvas = document.getElementById('captionsCanvas');
+
       if (instrumentCanvas && instrumentVideo) { // Check existence properly
           var ctx = instrumentCanvas.getContext('2d');
 
@@ -223,6 +239,128 @@
           }
           
       } // End of if (instrumentCanvas && instrumentVideo)
+
+            // --- CAPTION OVERLAY (Corrected)---
+            if (captionsCanvas && captionsVideo) {
+        // Get canvas context ONCE, ensure it's the correct one
+        var captionsCtx = captionsCanvas.getContext('2d'); // Use a distinct variable name
+
+        function resizeCaptionsCanvas() { // Use distinct function name
+          if (!characterVideo || !captionsCanvas) return;
+          // Ensure canvas matches the video element's displayed size
+          captionsCanvas.width = characterVideo.clientWidth;
+          captionsCanvas.height = characterVideo.clientHeight;
+        }
+        window.addEventListener('resize', resizeCaptionsCanvas);
+        // Also listen for the video metadata to be loaded for initial sizing
+        characterVideo.addEventListener('loadedmetadata', resizeCaptionsCanvas);
+        resizeCaptionsCanvas(); // Initial resize attempt
+
+        characterVideo.addEventListener('play', function(){
+          if (!captionsVideo) return;
+          // Try to sync before playing
+          captionsVideo.currentTime = characterVideo.currentTime;
+          captionsVideo.play().catch(e => console.error("Captions play error:", e)); // Catch potential errors
+          requestAnimationFrame(updateCaptionsFrame); // Start the loop
+        });
+
+        characterVideo.addEventListener('pause', function(){
+          if (!captionsVideo) return;
+          captionsVideo.pause();
+          // Note: requestAnimationFrame will stop naturally when the main video is paused
+        });
+
+        characterVideo.addEventListener('seeked', function() {
+          if (!captionsVideo) return;
+          captionsVideo.currentTime = characterVideo.currentTime;
+          // If paused after seeking, draw one frame
+          if (characterVideo.paused) {
+            // Request a single frame update after seeking while paused
+            requestAnimationFrame(updateCaptionsFrame);
+          }
+        });
+
+        function updateCaptionsFrame() {
+          // Ensure contexts and elements are valid before proceeding
+          if (!characterVideo || !captionsVideo || !captionsCanvas || !captionsCtx || captionsVideo.readyState < 2) {
+              // If resources aren't ready, try again slightly later only if main video is playing
+              if (!characterVideo.paused && !characterVideo.ended) {
+                  requestAnimationFrame(updateCaptionsFrame);
+              }
+              return;
+          }
+
+          // Stop the loop if the character video stopped
+          if (characterVideo.paused || characterVideo.ended) {
+              // Optional: Clear canvas when paused/ended if desired
+              // captionsCtx.clearRect(0, 0, captionsCanvas.width, captionsCanvas.height);
+              return;
+          }
+
+          // Synchronization (Keep this, might need tuning)
+          const timeDiff = captionsVideo.currentTime - characterVideo.currentTime;
+          // Sync if difference is too large OR if captions somehow got ahead (less likely but possible)
+          if (Math.abs(timeDiff) > 0.2) { // Increased tolerance slightly
+            console.log("Syncing captions:", characterVideo.currentTime);
+            captionsVideo.currentTime = characterVideo.currentTime;
+          }
+
+          // Calculate drawing dimensions to maintain aspect ratio
+          if (captionsVideo.videoWidth > 0 && captionsVideo.videoHeight > 0) {
+            var videoAspect = captionsVideo.videoWidth / captionsVideo.videoHeight;
+            var canvasAspect = captionsCanvas.width / captionsCanvas.height;
+            var drawWidth, drawHeight, offsetX, offsetY;
+
+            // Calculate letterbox/pillarbox dimensions
+            if (canvasAspect > videoAspect) { // Canvas wider than video -> letterbox
+              drawHeight = captionsCanvas.height;
+              drawWidth = drawHeight * videoAspect;
+              offsetX = (captionsCanvas.width - drawWidth) / 2;
+              offsetY = 0;
+            } else { // Canvas taller than video (or same aspect) -> pillarbox
+              drawWidth = captionsCanvas.width;
+              drawHeight = drawWidth / videoAspect;
+              offsetX = 0;
+              offsetY = (captionsCanvas.height - drawHeight) / 2;
+            }
+
+            // Clear the *entire* canvas before drawing the new frame
+            captionsCtx.clearRect(0, 0, captionsCanvas.width, captionsCanvas.height);
+
+            // Draw the current frame of the captions video onto the canvas
+            try {
+              // Ensure calculated dimensions are valid numbers
+              if (isFinite(offsetX) && isFinite(offsetY) && isFinite(drawWidth) && isFinite(drawHeight) && drawWidth > 0 && drawHeight > 0) {
+                  captionsCtx.drawImage(captionsVideo, offsetX, offsetY, drawWidth, drawHeight);
+              } else {
+                  // Fallback or skip drawing if dimensions are invalid
+                   // console.warn("Invalid dimensions for captions drawImage:", offsetX, offsetY, drawWidth, drawHeight);
+              }
+            } catch (e) {
+              console.error("Error drawing captions video:", e);
+              // Don't stop the loop on a single draw error
+            }
+          } else {
+             // Video dimensions not available yet, clear canvas
+             captionsCtx.clearRect(0, 0, captionsCanvas.width, captionsCanvas.height);
+          }
+
+          // Continue the loop
+          requestAnimationFrame(updateCaptionsFrame);
+        }
+
+        // Ensure initial frame is drawn if video might already be playing or preloaded
+        // Use 'loadeddata' or similar event for reliability if needed
+         if (!characterVideo.paused) {
+            requestAnimationFrame(updateCaptionsFrame);
+         } else {
+           // If starting paused, try drawing one frame in case it's needed
+            characterVideo.addEventListener('canplay', () => {
+                 if(characterVideo.paused) { requestAnimationFrame(updateCaptionsFrame); }
+            }, { once: true }); // Only run once
+         }
+
+      } // End of if (captionsCanvas && captionsVideo)
 
       // --- Captions Toggle Logic (Existing) ---
       const captionsToggle = document.getElementById('captions-toggle');
