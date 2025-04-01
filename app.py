@@ -14,10 +14,10 @@ db = CloudDB(connection_string, db_name='AvatarInteractions')
 # We have just one "song" in this scenario:
 SONG_NAMES = {
     "Die With a Smile": "die_with_a_smile", 
-    "Someone Like You": "adele", 
+    "Someone Like You": "Adele", 
     "Happy": "happy", 
     "Imperial March": "imperial", 
-    "Mario Theme Song": "mario", 
+    "Mario Theme Song": "Mario", 
     "Vivaldi Spring": "spring", 
     "Uptown Funk": "uptown", 
     "Moonlight": "moonlight"
@@ -35,18 +35,18 @@ INSTRUMENT_VIDEOS = {
 }
 
 def get_song_file(song_name, character_name, energy_level=None):
-    file_path = f"{SONG_NAMES[song_name]}/{SONG_NAMES[song_name]}_{character_name}.mp4"
+    file_path = f"{SONG_NAMES[song_name]}/{SONG_NAMES[song_name].lower()}_{character_name}.mp4"
     return file_path
     
 
 def get_instrument_file(song_name, instrument_name):
     #return "Adele/adele_instrument_piano.webm"
-    file_path = f"{SONG_NAMES[song_name]}/{SONG_NAMES[song_name]}_{INSTRUMENT_VIDEOS[instrument_name]}.webm"
+    file_path = f"{SONG_NAMES[song_name]}/{SONG_NAMES[song_name].lower()}_{INSTRUMENT_VIDEOS[instrument_name]}.webm"
     return file_path
 
 def get_captions_file(song_name):
     #return "Adele/adele_captions.webm"
-    file_path = f"{SONG_NAMES[song_name]}/{SONG_NAMES[song_name]}_captions.webm"
+    file_path = f"{SONG_NAMES[song_name]}/{SONG_NAMES[song_name].lower()}_captions.webm"
     return file_path
 
 @app.route('/<user_id>', methods=['GET', 'POST'])
