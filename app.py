@@ -14,10 +14,10 @@ db = CloudDB(connection_string, db_name='AvatarInteractions')
 # We have just one "song" in this scenario:
 SONG_NAMES = {
     "Die With a Smile": "die_with_a_smile", 
-    "Someone Like You": "Adele", 
+    "Someone Like You": "adele", 
     "Happy": "happy", 
     "Imperial March": "imperial", 
-    "Mario Theme Song": "Mario", 
+    "Mario Theme Song": "mario", 
     "Vivaldi Spring": "spring", 
     "Uptown Funk": "uptown", 
     "Vivaldi Winter": "winter",
