@@ -5,3 +5,5 @@ __pycache__/
 .env
 virtualenv/
 static/videos_backup/
+static/videos_backup_main/
+test.py

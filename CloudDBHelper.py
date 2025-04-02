@@ -36,8 +36,8 @@ class CloudDB:
 
             return result
         
-        except sqlitecloud.exceptions.SQLiteCloudIntegrityError as e:
-            print(f"SQLiteCloudIntegrityError: {e}")
+        except (sqlitecloud.exceptions.SQLiteCloudIntegrityError, sqlitecloud.exceptions.SQLiteCloudException) as e:
+            print(f"SQLiteError: {e}")
             self.conn.close()
             self.conn = sqlitecloud.connect(self.connection_string)
             self.conn.row_factory = dict_row_factory
@@ -81,8 +81,13 @@ class CloudDB:
     def add_user(self, user_name):
         
         query = """INSERT INTO Users (user_name) VALUES (?);"""
-        self._execute_query(query, (user_name))
+        self._execute_query(query, (user_name,))
         print(f"Added user: {user_name}")
+        return self.get_user_id(user_name)
+    
+    def get_user_id(self, user_name):
+        query = """SELECT user_id FROM Users WHERE user_name = ?;"""
+        return self._execute_query(query, (user_name,), fetch_one=True)["user_id"]
 
     def add_form(self, form_info):
         if form_info[0] == "":
@@ -109,7 +114,7 @@ class CloudDB:
         print(f"Added form: {form_info[0]} - {form_info[1]} - {form_info[2]} - {form_info[3]}")
         return form_id
 
-    def get_form_id(self, form_info):
+    def get_form_id(self, form_info: tuple[str, str, str, str]):
 
         query = """SELECT form_id FROM Forms WHERE song_name = ? AND character = ? AND instrument = ? AND captions = ?;"""
         form_id = self._execute_query(query, form_info, fetch_one=True)
@@ -161,8 +166,26 @@ if __name__ == "__main__":
         db.drop_all_tables()
         exit()
 
-    # db.add_user("John Doe")
-    # db.add_user("Jane Doe")
+    # shinwon = db.add_user("Shinwon")
+    # ken = db.add_user("Ken")
+    # matthew = db.add_user("Matthew")
+    # geo = db.add_user("Geo")
+    # catherine = db.add_user("Catherine")
+    # caroline = db.add_user("Caroline")
+
+    shinwon = db.get_user_id("Shinwon")
+    ken = db.get_user_id("Ken")
+    matthew = db.get_user_id("Matthew")
+    geo = db.get_user_id("Geo")
+    catherine = db.get_user_id("Catherine")
+    caroline = db.get_user_id("Caroline")
+    print(f"Shinwon: https://music-avatar-9c2314b9b73e.herokuapp.com/{shinwon}")
+    print(f"Ken: https://music-avatar-9c2314b9b73e.herokuapp.com/{ken}")
+    print(f"Matthew: https://music-avatar-9c2314b9b73e.herokuapp.com/{matthew}")
+    print(f"Geo: https://music-avatar-9c2314b9b73e.herokuapp.com/{geo}")
+    print(f"Catherine: https://music-avatar-9c2314b9b73e.herokuapp.com/{catherine}")
+    print(f"Caroline: https://music-avatar-9c2314b9b73e.herokuapp.com/{caroline}")
+    
     #db.add_form(("Song1", "Character1", "Instrument1", "off"))
     #db.add_interaction("user1", ("Song1", "Character1", "Instrument1", "off"), ("Song1", "Character1", "Instrument1", "on"))
 
